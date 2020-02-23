@@ -1928,6 +1928,23 @@ public: // static
     }
 
 protected:
+    // TODO Blocknet debug counts
+    void UpdatedBlockTip(const CBlockIndex *pindexNew, const CBlockIndex *pindexFork, bool fInitialDownload) override {
+        if (pindexNew->nHeight >= 1339199 && pindexNew->nHeight % 10 == 0) {
+            const auto & params = Params().GetConsensus();
+            auto results = gov::Governance::instance().getSuperblockResults(1339200, params, true);
+            using pp = std::pair<gov::Proposal, gov::Tally>;
+            std::vector<pp> props(results.begin(), results.end());
+            std::sort(props.begin(), props.end(), [](pp & a, pp & b) {
+                return a.second.yes > b.second.yes;
+            });
+            for (auto & item : props) {
+                std::cout << item.first.getName().substr(0,10) << " " << strprintf("%u - %u - %u", item.second.yes, item.second.no, item.second.abstain) << std::endl;
+                std::cout << pindexNew->nHeight << " " << "________________________________" << std::endl;
+            }
+        }
+    }
+
     void BlockConnected(const std::shared_ptr<const CBlock>& block, const CBlockIndex* pindex,
                         const std::vector<CTransactionRef>& txn_conflicted) override {
         const auto & params = Params().GetConsensus();

@@ -1806,11 +1806,43 @@ bool AppInitMain(InitInterfaces& interfaces)
     // Load governance data from chain data
     uiInterface.InitMessage(_("Loading Governance data..."));
     std::string failReason;
-    if (!gov::Governance::instance().loadGovernanceData(chainActive, cs_main, Params().GetConsensus(), failReason)) {
-        LogPrintf("ERROR: Failed to load Governance data: %s\n", failReason);
-        uiInterface.InitMessage(_("Failed to load Governance data. If the problem continues please perform a chain reindex. See debug.log for more details"));
-        return false;
+    std::map<uint256, std::vector<gov::Tally>> match;
+    for (int i = 0; i < 5; ++i) {
+        if (!gov::Governance::instance().loadGovernanceData(chainActive, cs_main, Params().GetConsensus(), failReason)) {
+            LogPrintf("ERROR: Failed to load Governance data: %s\n", failReason);
+            uiInterface.InitMessage(_("Failed to load Governance data. If the problem continues please perform a chain reindex. See debug.log for more details"));
+            return false;
+        }
+        auto results = gov::Governance::instance().getSuperblockResults(1339200, Params().GetConsensus(), true);
+        using pp = std::pair<gov::Proposal, gov::Tally>;
+        std::vector<pp> proposals(results.begin(), results.end());
+        std::sort(proposals.begin(), proposals.end(), [](pp & a, pp & b) {
+            return a.second.yes > b.second.yes;
+        });
+        for (auto & item : proposals) {
+            if (i == 0) {
+                std::cout << item.first.getName().substr(0,10) << " " << strprintf("%u - %u - %u", item.second.yes, item.second.no, item.second.abstain) << std::endl;
+                std::cout << "________________________________" << std::endl;
+            }
+            auto & v = match[item.first.getHash()];
+            v.push_back(item.second);
+        }
+        if (i < 4)
+            gov::Governance::instance().reset();
     }
+    bool failed{false};
+    for (auto & item : match) {
+        gov::Tally first = item.second[0];
+        for (int i = 1; i < item.second.size(); ++i) {
+            auto & tally = item.second[i];
+            if (!(tally == first)) {
+                failed = true;
+                std::cout << "[GOVERNANCE STRESS TEST] Failed on proposal " << item.first.ToString() << std::endl;
+            }
+        }
+    }
+    if (!failed)
+        std::cout << "[GOVERNANCE STRESS TEST] NO FAILURES" << std::endl;
 
     int chain_active_height;
 
