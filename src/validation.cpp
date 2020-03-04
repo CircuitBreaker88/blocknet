@@ -3963,7 +3963,7 @@ fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix)
 
 CBlockIndex * CChainState::InsertBlockIndex(const uint256& hash)
 {
-    AssertLockHeld(cs_main);
+//    AssertLockHeld(cs_main); // Blocknet: concurrent block index loading doesn't require explicit cs_main lock
 
     if (hash.IsNull())
         return nullptr;
@@ -3987,8 +3987,8 @@ bool CChainState::LoadBlockIndex(const Consensus::Params& consensus_params, CBlo
         return false;
 
     std::atomic<int> counter{0};
-    std::atomic<double> pcounter{85};
-    std::atomic<int> pprog{0};
+    std::atomic<double> pcounter{80};
+    std::atomic<int> pprog{80};
     const int totalprogress{100};
     auto progress = [&counter,&pcounter,&pprog,totalprogress](const double & unit, const double & total, const double & percent) {
         ++counter;
@@ -4013,7 +4013,7 @@ bool CChainState::LoadBlockIndex(const Consensus::Params& consensus_params, CBlo
     {
         CBlockIndex* pindex = item.second;
         vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
-        progress(1, mbiCount, 3); // total progress in LoadBlockIndex must be <= 10
+        progress(1, mbiCount, 6); // total progress in LoadBlockIndex must be <= 20
     }
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const std::pair<int, CBlockIndex*>& item : vSortedByHeight)
@@ -4052,7 +4052,7 @@ bool CChainState::LoadBlockIndex(const Consensus::Params& consensus_params, CBlo
         if (!IsProtocolV05(pindex->GetBlockTime()))
             mapHeaderIndex[pindex->nHeight] = pindex;
 
-        progress(1, mbiCount, 7); // total progress in LoadBlockIndex must be <= 10
+        progress(1, mbiCount, 14); // total progress in LoadBlockIndex must be <= 10
     }
 
     LogPrintf("[DONE].\n");
